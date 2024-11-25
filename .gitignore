@@ -1,0 +1,30 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+*.env
+.venv/
+
+# Python-specific files
+*.egg
+*.pyd
+*.pyo
+*.pdb
+*.whl
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# project files
+*.mp4
+*.m3u8
+tmp*
+parts/
+.dev/
