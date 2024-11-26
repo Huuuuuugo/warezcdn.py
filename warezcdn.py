@@ -2,7 +2,6 @@
 # TODO: implement a 'search and download' function
 # TODO: create docstrings
 # TODO: show steps of the process to get the download link
-# TODO: give better names to the output files from episodes
 import argparse
 import typing
 import json
@@ -203,14 +202,30 @@ def download_serie(
     
     # download selected episode
     for episode_info in season_info['episodes'].values():
+        # get info for ep_name
+        season_number = season_info['name'].zfill(2)
+        ep_number = episode_info['name'].zfill(2)
+        ep_title = episode_info['titlePt']
+
+        # use episode title only if it's neither None nor a placeholder
+        if ep_title is not None:
+            if re.match(r"Episódio \d+", ep_title):
+                ep_title = None
+        if ep_title:
+            ep_title = f' - {ep_title}'
+        else:
+            ep_title = ''
+        
+        # create episode name string a get episode id
+        ep_name = f'{serie_info['title']} (S{season_number}E{ep_number}){ep_title}'
+        id = episode_info['id']
+
+        # download episode
         if episodes == 'all':
-            ep_name = f'{episode_info['name']} - {episode_info['titlePt']}'
-            id = episode_info['id']
             download_episode(ep_name, imdb, id, lang)
 
         elif int(episode_info['name']) in episodes:
-            ep_name = f'{episode_info['name']} - {episode_info['titlePt']}'
-            id = episode_info['id']
+            print(ep_name)
             download_episode(ep_name, imdb, id, lang)
     
 
