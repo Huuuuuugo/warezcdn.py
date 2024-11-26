@@ -92,13 +92,27 @@ class Download():
         else:
             headers = headers.copy()
 
-        # make a request to get the total size of the file
-        # if 'try_continue' is false, this will be used as the download request instead
+        if self.try_continue:
+            # get ammount of bytes already written before beggining
+            if os.path.exists(output_file):
+                self.written_bytes = os.path.getsize(self.output_file)
+            else:
+                self.written_bytes = 0
+            
+            # set range to resume download if any byte has already been written
+            if self.written_bytes:
+                headers.update({"Range": f"bytes={self.written_bytes}-"})
+        
+        else:
+            self.total_size = 0
+            self.written_bytes = 0
+
+        # make a request
         for attempt in range(max_retries + 1):
             try:
-                request_size = requests.get(url, headers=headers, stream=True)
-                if request_size.status_code not in (200, 206):
-                    message = f"Unexpected status code when requesting file: {request_size.status_code}. Retrying..."
+                self.response = requests.get(url, headers=headers, stream=True)
+                if self.response.status_code not in (200, 206):
+                    message = f"Unexpected status code when requesting file: {self.response.status_code}. Retrying..."
                     warnings.warn(message, RuntimeWarning)
 
                     # exponentially increase wait time before retrying
@@ -115,58 +129,19 @@ class Download():
                 wait_time = base_retry_delay * (2 ** attempt)
                 time.sleep(wait_time)
 
-
-        if request_size.status_code not in (200, 206):
-            message = f"Unexpected status code when requesting file size: {request_size.status_code}."
+        if self.response.status_code not in (200, 206):
+            message = f"Unexpected status code when requesting file size: {self.response.status_code}."
             raise requests.RequestException(message)
-        
+
         if self.try_continue:
             # store total_size inside a property
             try:
-                self.total_size = int(request_size.headers['Content-Length'])
-                request_size.close()
+                self.total_size = int(self.response.headers['Content-Length'])
 
             except KeyError:
                 message = f"The response has no 'Content-Length' header, resuming and progress tracking will not work. If the output file contains some data already, it will be completely cleared when 'start()' is called."
                 warnings.warn(message, UserWarning)
                 self.total_size = 0
-
-            # get ammount of bytes already written before beggining
-            if os.path.exists(output_file):
-                self.written_bytes = os.path.getsize(self.output_file)
-            else:
-                self.written_bytes = 0
-            
-            # set range to resume download if any byte has already been written
-            if self.total_size == 0 or self.written_bytes == 0:
-                self.response = request_size
-
-            else:
-                headers.update({
-                    "Range": f"bytes={self.written_bytes}-"
-                })
-
-                for attempt in range(max_retries + 1):
-                    self.response = requests.get(url, headers=headers, stream=True)
-                    if request_size.status_code not in (200, 206):
-                        message = f"Unexpected status code when requesting file range: {request_size.status_code}. Retrying..."
-                        warnings.warn(message, RuntimeWarning)
-
-                        # exponentially increase wait time before retrying
-                        wait_time = base_retry_delay * (2 ** attempt)
-                        time.sleep(wait_time)
-
-                    else:
-                        break
-            
-                if self.response.status_code not in (200, 206):
-                    message = f"Unexpected status code when requesting file range: {self.response.status_code}."
-                    raise requests.RequestException(message)
-        
-        else:
-            self.total_size = 0
-            self.written_bytes = 0
-            self.response = request_size
 
         Download.download_list.append(self)
 
