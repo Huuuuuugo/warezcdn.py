@@ -8,9 +8,10 @@ import json
 import re
 
 from bs4 import BeautifulSoup
+import STPyV8
 import requests
 
-from utils import download_from_m3u8
+from utils import download_from_m3u8, download_from_mixdrop
 
 
 host = 'warezcdn.link'
@@ -89,7 +90,7 @@ def get_audios(imdb: str, id: str, type: typing.Literal['movie', 'filme', 'serie
             return json.loads(audio_data)
 
 
-def get_parts_url(
+def get_video_url(
         imdb: str,
         id: str, 
         server: typing.Literal['warezcdn', 'mixdrop'], 
@@ -125,60 +126,104 @@ def get_parts_url(
             video_html_url = video_html_url[0]
             break
 
-    # extract information about the video from video_html_url
-    video_host = re.findall(r"https://(.+?)/", video_html_url)[0]
-    video_host_url = f'https://{video_host}'
-    video_hash = re.findall(r"/([\w]+?)(?:$|\?)", video_html_url)[0]
+    match server:
+        case 'warezcdn':
+            # extract information about the video from video_html_url
+            video_host = re.findall(r"https://(.+?)/", video_html_url)[0]
+            video_host_url = f'https://{video_host}'
+            video_hash = re.findall(r"/([\w]+?)(?:$|\?)", video_html_url)[0]
 
-    # make request for master.m3u8 url based on data from video_html_url
-    master_request_url = f'{video_host_url}/player/index.php?data={video_hash}&do=getVideo'
+            # make request for master.m3u8 url based on data from video_html_url
+            master_request_url = f'{video_host_url}/player/index.php?data={video_hash}&do=getVideo'
 
-    master_m3u8_url = requests.post(
-        master_request_url,
-        data={'hash': video_hash, 'r': ''},
-        headers={'X-Requested-With': 'XMLHttpRequest'}
-        )
-    
-    master_m3u8_url = master_m3u8_url.json()['videoSource']
+            master_m3u8_url = requests.post(
+                master_request_url,
+                data={'hash': video_hash, 'r': ''},
+                headers={'X-Requested-With': 'XMLHttpRequest'}
+                )
+            master_m3u8_url = master_m3u8_url.json()['videoSource']
 
-    # extract the url for the playlist containing all the parts from master.m3u8
-    master_m3u8 = requests.get(master_m3u8_url).text
-    for line in master_m3u8.split('\n'):
-        matches = re.match(r"https?://[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})(:\d+)?(/[^\s]*)?", line)
-        if matches:
-            playlist_url = matches[0]
-            break
+            # extract the url for the playlist containing all the parts from master.m3u8
+            master_m3u8 = requests.get(master_m3u8_url).text
+            for line in master_m3u8.split('\n'):
+                matches = re.match(r"https?://[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})(:\d+)?(/[^\s]*)?", line)
+                if matches:
+                    video_url = matches[0]
+                    break
         
-    return playlist_url
+        case 'mixdrop':
+            # requests html for the video player on mixdrop
+            video_html_response = requests.get(
+                video_html_url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"}
+                )
+            
+            # extract the obfuscated json that leads to the download url
+            video_html = BeautifulSoup(video_html_response.content, 'html.parser')
+            scripts = video_html.find_all('script')
+            for script in scripts:
+                if 'MDCore' in str(script.string):
+                    matches = re.findall(r"eval\((.+)\)", script.string)
+                    if matches:
+                        obfuscated_json = matches[0]
+                        break
+
+            # give a name to the deobfuscation function
+            obfuscated_json = re.sub(r"function\(p,a,c,k,e,d\)", 'function deobfuscate(p,a,c,k,e,d)', obfuscated_json)
+            # add a function call to the parameter given
+            obfuscated_json = re.sub(r"return p}\(", 'return p}\ndeobfuscate(', obfuscated_json)
+
+            # run obfuscated json to get the video download url
+            with STPyV8.JSContext() as ctxt:
+                mdcore = ctxt.eval(obfuscated_json)
+
+            video_url = f'https:{re.findall(r"MDCore.wurl=\"(.+?)\"", mdcore)[0]}'
+    
+    return video_url
 
 
-# TODO: warn if prefered audio is unavaliable
-def download_episode(ep_name: str, imdb: str, id: str, preferred_audio: typing.Literal['1', '2']):
+def download_episode(
+        ep_name: str, 
+        imdb: str, 
+        id: str, 
+        preferred_audio: typing.Literal['1', '2'], 
+        prefered_server: typing.Literal['warezcdn', 'mixdrop']
+        ):
+    # get audio optiona valiable for the file
     audios = get_audios(imdb, id, 'serie')
+
+    # selects the prefered audio, if avaliable
+    # if not avaliable, selects whatever is avaliable instead
     for audio in audios:
         if audio['audio'] == preferred_audio:
             break
-
-    if 'warezcdn' in audio['servers']:
-        server = 'warezcdn'
-    else:
-        server = 'mixdrop'
+    if audio['audio'] != preferred_audio:
+        print("Áudio selecionado indisponível!")
     
-    if server == 'warezcdn':
-        parts_url = get_parts_url(imdb, audio['id'], server, audio['audio'], 'serie')
+    # selects the prefered server, if avaliable
+    # if not avaliable, selects whatever is avaliable instead
+    if prefered_server in audio['servers']:
+        server = prefered_server
+    else:
+        print("Servidor selecionado indisponível!")
+        server = audio['servers']
+    
+    # get download url and download from the correct server
+    video_url = get_video_url(imdb, audio['id'], server, audio['audio'], 'serie')
+    match server:
+        case 'warezcdn':
+            download_from_m3u8(video_url, f'{ep_name}.mp4')
         
-        download_from_m3u8(parts_url, f'{ep_name}.mp4')
-    
-    else:
-        msg = "O episódio possui apenas o servido 'mixdrop', que ainda não é suportado."
-        raise Exception(msg)
+        case 'mixdrop':
+            download_from_mixdrop(video_url, f'{ep_name}.mp4')
 
 
 def download_serie(
         imdb: str, 
         season: int, 
         episodes: int | list[int] | typing.Literal['all'], 
-        preferred_audio: typing.Literal['dublado', 'original']
+        preferred_audio: typing.Literal['dublado', 'original'],
+        prefered_server: typing.Literal['warezcdn', 'mixdrop']
     ):
     # get language id for prefered audio
     match preferred_audio:
@@ -187,6 +232,8 @@ def download_serie(
         
         case 'original':
             lang = '1'
+    
+    server = prefered_server
     
     # turn single episode into list
     if isinstance(episodes, int):
@@ -222,34 +269,47 @@ def download_serie(
 
         # download episode
         if episodes == 'all':
-            download_episode(ep_name, imdb, id, lang)
+            download_episode(ep_name, imdb, id, lang, server)
 
         elif int(episode_info['name']) in episodes:
-            print(ep_name)
-            download_episode(ep_name, imdb, id, lang)
+            download_episode(ep_name, imdb, id, lang, server)
     
 
-# TODO: warn if prefered audio is unavaliable
-def download_filme(imdb: str, preferred_audio: typing.Literal['dublado', 'original']):
+def download_filme(
+        imdb: str, 
+        preferred_audio: 
+        typing.Literal['dublado', 'original'],
+        prefered_server: typing.Literal['warezcdn', 'mixdrop']
+        ):
     filme_info = filme(imdb)
 
+    # get audio options avaliable for the file
     audios = get_audios(imdb, filme_info['id'], 'filme')
+
+    # selects the prefered audio, if avaliable
+    # if not avaliable, selects whatever is avaliable instead
     for audio in audios:
         if audio['audio'] == preferred_audio:
             break
-
-    if 'warezcdn' in audio['servers']:
-        server = 'warezcdn'
-    else:
-        server = 'mixdrop'
+    if audio['audio'] != preferred_audio:
+        print("Áudio selecionado indisponível!")
     
-    if server == 'warezcdn':
-        parts_url = get_parts_url(imdb, audio['id'], server, audio['audio'], 'serie')
-        download_from_m3u8(parts_url, f'{filme_info['title']}.mp4')
-    
+    # selects the prefered server, if avaliable
+    # if not avaliable, selects whatever is avaliable instead
+    if prefered_server in audio['servers']:
+        server = prefered_server
     else:
-        msg = "O episódio possui apenas o servidor 'mixdrop', que ainda não é suportado."
-        raise Exception(msg)
+        print("Servidor selecionado indisponível!")
+        server = audio['servers']
+    
+    # get download url and download from the correct server
+    video_url = get_video_url(imdb, audio['id'], server, audio['audio'], 'filme')
+    match server:
+        case 'warezcdn':
+            download_from_m3u8(video_url, f'{filme_info['title']}.mp4')
+        
+        case 'mixdrop':
+            download_from_mixdrop(video_url, f'{filme_info['title']}.mp4')
 
 
 if __name__ == "__main__":
@@ -298,6 +358,11 @@ if __name__ == "__main__":
         choices=['dublado', 'original'], required=True, 
         help='preferência de áudio (dublado ou original).'
     )
+    download_filme_parser.add_argument(
+        '-s', '--servidor', 
+        choices=['warezcdn', 'mixdrop'], required=True, 
+        help='preferência de servidor (warezcdn ou mixdrop).'
+    )
 
     # serie parser
     download_serie_parser = download_subparser.add_parser('serie', help='cole informações de uma série.')
@@ -320,6 +385,11 @@ if __name__ == "__main__":
         '-a', '--audio', 
         choices=['dublado', 'original'], required=True, 
         help='preferência de áudio (dublado ou original).'
+    )
+    download_serie_parser.add_argument(
+        '-s', '--servidor', 
+        choices=['warezcdn', 'mixdrop'], required=True, 
+        help='preferência de servidor (warezcdn ou mixdrop).'
     )
 
 
@@ -344,13 +414,13 @@ if __name__ == "__main__":
         case 'download':
             match args.variant:
                 case 'filme':
-                    download_filme(args.imdb, args.audio)
+                    download_filme(args.imdb, args.audio, args.servidor)
                 
                 case 'serie':
                     if args.episodios[0] == -1:
                         args.episodios == 'all'
 
-                    download_serie(args.imdb, args.temporada, args.episodios, args.audio)
+                    download_serie(args.imdb, args.temporada, args.episodios, args.audio, args.servidor)
                 
                 case _:
                     parser.print_help()

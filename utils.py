@@ -1,5 +1,6 @@
 # TODO: add support for mixdrop downloads
 # TODO: create docstrings
+# TODO: create a local directory for unfinished downloads from warez or mixdrop
 import requests
 
 from tempfile import TemporaryDirectory
@@ -117,3 +118,13 @@ def download_from_m3u8(url: str, output_file: str):
         parts_dir = download_parts(m3u8_path, output_dir=path, max_downloads=5)
         local_m3u8_path = create_local_m3u8(m3u8_path, parts_dir)
         concat(local_m3u8_path, output_file)
+
+
+def download_from_mixdrop(url: str, output_file: str):
+    Download(
+        url, output_file, max_retries=6,
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"},
+        ).start()
+    
+    Download.wait_downloads()
+    print()
