@@ -73,10 +73,10 @@ def create_local_m3u8(m3u8_path: str, parts_dir: str):
     
     full_parts_dir = os.path.abspath(parts_dir) + '/'
 
-    # create function to properly order the files inside the given directory
-    def extract_number(filename):
-        match = re.search(r'(\d+)', filename)
-        return int(match.group(0)) if match else 0
+    # create filter function to properly order the files inside the given directory
+    def extract_number(file_name):
+        number = re.sub(r'\D', '', file_name)
+        return int(number) if number else 0
 
     # get files list and order them
     parts = [file for file in os.listdir(parts_dir) if file.rsplit('.', 1)[-1] == 'mp4']
