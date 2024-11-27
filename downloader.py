@@ -129,10 +129,6 @@ class Download():
                 wait_time = base_retry_delay * (2 ** attempt)
                 time.sleep(wait_time)
 
-        if self.response.status_code not in (200, 206):
-            message = f"Unexpected status code when requesting file size: {self.response.status_code}."
-            raise requests.RequestException(message)
-
         if self.try_continue:
             # store total_size inside a property
             try:
@@ -155,7 +151,7 @@ class Download():
             The progress of the download as a percentage (0 to 100).
         """
         if self.total_size:
-            return self.written_bytes/(self.total_size/100)
+            return round(self.written_bytes/(self.total_size/100), 5)
 
         else:
             return 0
@@ -289,6 +285,10 @@ class Download():
             self.is_running = False
             self._interrupt_download = False
             Download.download_list.pop(Download.download_list.index(self))
+        
+        if self.response.status_code not in (200, 206):
+            message = f"Unexpected status code when requesting file size: {self.response.status_code}."
+            raise requests.RequestException(message)
 
         if self.progress >= 100:
             Download.download_list.pop(Download.download_list.index(self))
