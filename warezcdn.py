@@ -4,8 +4,10 @@
 # TODO: show steps of the process to get the download link
 import argparse
 import typing
+import shutil
 import json
 import re
+import os
 
 from bs4 import BeautifulSoup
 import STPyV8
@@ -16,6 +18,7 @@ from utils import download_from_m3u8, download_from_mixdrop
 
 host = 'warezcdn.link'
 host_url = f'https://embed.{host}'
+temp_download_dir = './.download/'
 
 
 def search(search_term: str):
@@ -210,12 +213,20 @@ def download_episode(
     
     # get download url and download from the correct server
     video_url = get_video_url(imdb, audio['id'], server, audio['audio'], 'serie')
+
+    # create temporary directory for the download
+    temp_dir = f'{temp_download_dir}{id}{audio['id']}'
+    os.makedirs(temp_dir, exist_ok=True)
+
     match server:
         case 'warezcdn':
-            download_from_m3u8(video_url, f'{ep_name}.mp4')
+            download_from_m3u8(video_url, f'{ep_name}.mp4', temp_dir)
         
         case 'mixdrop':
             download_from_mixdrop(video_url, f'{ep_name}.mp4')
+
+    # remove temp dir after finnished
+    shutil.rmtree(temp_dir)
 
 
 def download_serie(
@@ -301,15 +312,22 @@ def download_filme(
     else:
         print("Servidor selecionado indisponível!")
         server = audio['servers']
+
+    # create temporary directory for the download
+    temp_dir = f'{temp_download_dir}{filme_info['id']}{audio['id']}'
+    os.makedirs(temp_dir, exist_ok=True)
     
-    # get download url and download from the correct server
+    # get download url and start downloading from the correct server
     video_url = get_video_url(imdb, audio['id'], server, audio['audio'], 'filme')
     match server:
         case 'warezcdn':
-            download_from_m3u8(video_url, f'{filme_info['title']}.mp4')
+            download_from_m3u8(video_url, f'{filme_info['title']}.mp4', temp_dir)
         
         case 'mixdrop':
             download_from_mixdrop(video_url, f'{filme_info['title']}.mp4')
+    
+    # remove temp dir after finnished
+    shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
@@ -418,7 +436,7 @@ if __name__ == "__main__":
                 
                 case 'serie':
                     if args.episodios[0] == -1:
-                        args.episodios == 'all'
+                        args.episodios = 'all'
 
                     download_serie(args.imdb, args.temporada, args.episodios, args.audio, args.servidor)
                 
