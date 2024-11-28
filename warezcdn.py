@@ -194,6 +194,8 @@ def download_episode(
         ):
     # get audio optiona valiable for the file
     audios = get_audios(imdb, id, 'serie')
+    
+    ep_name = re.sub(r"[\\\/\:\*\?\"\<\>\|]", '', ep_name)
 
     # selects the prefered audio, if avaliable
     # if not avaliable, selects whatever is avaliable instead
@@ -223,7 +225,7 @@ def download_episode(
             download_from_m3u8(video_url, f'{ep_name}.mp4', temp_dir)
         
         case 'mixdrop':
-            download_from_mixdrop(video_url, f'{ep_name}.mp4')
+            download_from_mixdrop(video_url, f'{ep_name}.mp4', temp_dir)
 
     # remove temp dir after finnished
     shutil.rmtree(temp_dir)
@@ -293,6 +295,8 @@ def download_filme(
         prefered_server: typing.Literal['warezcdn', 'mixdrop']
         ):
     filme_info = filme(imdb)
+    filme_name = re.sub(r"[\\\/\:\*\?\"\<\>\|]", '', filme_info['title'])
+
 
     # get audio options avaliable for the file
     audios = get_audios(imdb, filme_info['id'], 'filme')
@@ -321,10 +325,10 @@ def download_filme(
     video_url = get_video_url(imdb, audio['id'], server, audio['audio'], 'filme')
     match server:
         case 'warezcdn':
-            download_from_m3u8(video_url, f'{filme_info['title']}.mp4', temp_dir)
+            download_from_m3u8(video_url, f'{filme_name}.mp4', temp_dir)
         
         case 'mixdrop':
-            download_from_mixdrop(video_url, f'{filme_info['title']}.mp4')
+            download_from_mixdrop(video_url, f'{filme_name}.mp4', temp_dir)
     
     # remove temp dir after finnished
     shutil.rmtree(temp_dir)

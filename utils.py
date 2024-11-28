@@ -4,6 +4,7 @@
 import requests
 
 import subprocess
+import shutil
 import json
 import time
 import os
@@ -42,7 +43,7 @@ def download_m3u8(url: str, output_file: str):
         file.write(response.content)
 
 
-def download_parts(m3u8_path: str, headers: dict = None, output_dir: str = './', max_downloads: int = 1):
+def download_parts(m3u8_path: str, headers: dict = None, output_dir: str = './', max_downloads: int = 1, label: str = ''):
     # fromat arguments
     if output_dir[-1] not in ('/', '\\'):
         output_dir += '/'
@@ -68,7 +69,7 @@ def download_parts(m3u8_path: str, headers: dict = None, output_dir: str = './',
         playlist = file.readlines()
         line_count = len(playlist)
         curr_line = 0
-        print('0.00%')
+        print(f'{label} 0.00%   ')
 
         # iterate through every lline of the playlist
         active_downloads = []
@@ -112,7 +113,7 @@ def download_parts(m3u8_path: str, headers: dict = None, output_dir: str = './',
 
                         time.sleep(0.01)
             
-            print(f"\033[F\r{curr_line/(line_count/100):.2f}%")
+            print(f"\033[F\r{label} {curr_line/(line_count/100):.2f}%   ")
 
     return parts_dir
 
@@ -161,18 +162,57 @@ def concat(local_m3u8_path: str, output_file: str):
     
 
 def download_from_m3u8(url: str, output_file: str, temp_dir: str):
+    # ask confirmatio if output file already exists
+    if os.path.exists(output_file):
+        choice = ''
+        while choice not in ('sim', 's', 'nao', 'não', 'n'):
+            choice = input(f'O arquivo \'{output_file}\' já existe! Quer substituí-lo (s/n)? ')
+            if choice in ('nao', 'não', 'n'):
+                return
+    
+    # get file name to show along the progress indicator 
+    matches = re.search(r"(?:/|\\)(.+?\.mp4)", output_file)
+    if matches:
+        file_name = matches[0]
+    else:
+        file_name = output_file
+    
+    label = f'(warezcdn) {file_name}'
+    
+    # download playlist
     m3u8_path = f"{temp_dir}/index.m3u8"
     download_m3u8(url, m3u8_path)
 
-    parts_dir = download_parts(m3u8_path, output_dir=temp_dir, max_downloads=5)
+    # download parts
+    parts_dir = download_parts(m3u8_path, output_dir=temp_dir, max_downloads=5, label=label)
     local_m3u8_path = create_local_m3u8(m3u8_path, parts_dir)
+
+    # create output file
     concat(local_m3u8_path, output_file)
 
 
-def download_from_mixdrop(url: str, output_file: str):
+def download_from_mixdrop(url: str, output_file: str, temp_dir: str):
+    # ask confirmatio if output file already exists
+    if os.path.exists(output_file):
+        choice = ''
+        while choice not in ('sim', 's', 'nao', 'não', 'n'):
+            choice = input(f'O arquivo \'{output_file}\' já existe! Quer substituí-lo (s/n)? ')
+            if choice in ('nao', 'não', 'n'):
+                return
+
+    # get file name to show along the progress indicator 
+    temp_file = f'{temp_dir}/downloading.mp4'
+    matches = re.search(r"(?:/|\\)(.+?\.mp4)", output_file)
+    if matches:
+        file_name = matches[0]
+    else:
+        file_name = output_file
+    
+    label = f'(mixdrop) {file_name}'
+
     try:
         download = Download(
-            url, output_file,
+            url, temp_file,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"},
             )
         download.start()
@@ -182,12 +222,18 @@ def download_from_mixdrop(url: str, output_file: str):
         if download.response.status_code == 416:
             index = download.download_list.index(download)
             download.download_list.pop(index)
-            matches = re.search(r"(?:/|\\)(.+?\.mp4)", output_file)
-            if matches:
-                print(f'{matches[0]} 100%')
-            else:
-                print(f'{output_file} 100%')
+            download = None
         else:
             raise e
     
-    Download.wait_downloads()
+    # wait for download to finnish and show progress
+    print()
+    if download is not None:
+        while download.progress < 100:
+            print(f'\033[F\r{label} {download.progress:.2f}%   ')
+            time.sleep(0.1)
+    
+    print(f'\033[F\r{label} 100%   ')
+
+    # move temp download to output file
+    shutil.move(temp_file, output_file)
