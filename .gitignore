@@ -24,7 +24,9 @@ env/
 
 # project files
 *.mp4
+*.mkv
 *.m3u8
+*.json
 tmp*
 parts/
 .dev/
