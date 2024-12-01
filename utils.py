@@ -101,17 +101,28 @@ def download_parts(m3u8_path: str, headers: dict = None, output_dir: str = './',
                     continue
                 
                 # wait if the limit of simultaneous downloads has been reached or all the file has been read
-                while len(active_downloads) >= max_downloads or line_count == curr_line:
+                while (len(active_downloads) >= max_downloads) or (line_count == curr_line):
                     # check for download progress
-                    for download in active_downloads:
-                        if download.progress >= 100:
-                            # update list of finished and active downloads
+                    finished_indexes = []
+                    for i, download in enumerate(active_downloads):
+                        if not download.is_running and download.progress >= 100:
+                            # update list of finished downloads
                             finished_downloads.append(download.part_name)
                             parts_json.save(finished_downloads)
-                            active_downloads.pop(active_downloads.index(download))
-                            break
 
-                        time.sleep(0.01)
+                            # set it to be deleted from active downloads
+                            finished_indexes.append(i)
+                        
+                    # update list of active downloads
+                    offset = 0
+                    for index in finished_indexes:
+                        active_downloads.pop(index-offset)
+                        offset += 1
+                    
+                    if len(active_downloads) == 0:
+                        break
+                    
+                    time.sleep(0.01)
             
             print(f"\033[F\r{label} {curr_line/(line_count/100):.2f}%   ")
 
@@ -154,7 +165,7 @@ def create_local_m3u8(m3u8_path: str, parts_dir: str):
 def concat(local_m3u8_path: str, output_file: str):
     # run ffmpeg to concatenate files
     print(os.getcwd())
-    subprocess.run(["ffmpeg",
+    subprocess.run(["ffmpeg", "-y",
                     "-i", local_m3u8_path, 
                     "-c", "copy",
                     f"{output_file}"
@@ -171,7 +182,7 @@ def download_from_m3u8(url: str, output_file: str, temp_dir: str):
                 return
     
     # get file name to show along the progress indicator 
-    matches = re.search(r"(?:/|\\)(.+?\.mp4)", output_file)
+    matches = re.findall(r"(?:/|\\)(?!.*(?:/|\\))(.+?\.mp4)", output_file)
     if matches:
         file_name = matches[0]
     else:
@@ -188,6 +199,7 @@ def download_from_m3u8(url: str, output_file: str, temp_dir: str):
     local_m3u8_path = create_local_m3u8(m3u8_path, parts_dir)
 
     # create output file
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     concat(local_m3u8_path, output_file)
 
 
@@ -202,7 +214,7 @@ def download_from_mixdrop(url: str, output_file: str, temp_dir: str):
 
     # get file name to show along the progress indicator 
     temp_file = f'{temp_dir}/downloading.mp4'
-    matches = re.search(r"(?:/|\\)(.+?\.mp4)", output_file)
+    matches = re.findall(r"(?:/|\\)(?!.*(?:/|\\))(.+?\.mp4)", output_file)
     if matches:
         file_name = matches[0]
     else:
@@ -229,11 +241,12 @@ def download_from_mixdrop(url: str, output_file: str, temp_dir: str):
     # wait for download to finnish and show progress
     print()
     if download is not None:
-        while download.progress < 100:
+        while download.is_running:
             print(f'\033[F\r{label} {download.progress:.2f}%   ')
             time.sleep(0.1)
-    
+            
     print(f'\033[F\r{label} 100%   ')
 
     # move temp download to output file
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     shutil.move(temp_file, output_file)

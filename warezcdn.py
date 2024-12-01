@@ -195,7 +195,7 @@ def download_episode(
     # get audio optiona valiable for the file
     audios = get_audios(imdb, id, 'serie')
     
-    ep_name = re.sub(r"[\\\/\:\*\?\"\<\>\|]", '', ep_name)
+    ep_name = re.sub(r"[\:\*\?\"\<\>\|]", '', ep_name)
 
     # selects the prefered audio, if avaliable
     # if not avaliable, selects whatever is avaliable instead
@@ -236,7 +236,8 @@ def download_serie(
         season: int, 
         episodes: int | list[int] | typing.Literal['all'], 
         preferred_audio: typing.Literal['dublado', 'original'],
-        prefered_server: typing.Literal['warezcdn', 'mixdrop']
+        prefered_server: typing.Literal['warezcdn', 'mixdrop'],
+        folders_mode: bool = False
     ):
     # get language id for prefered audio
     match preferred_audio:
@@ -277,7 +278,11 @@ def download_serie(
             ep_title = ''
         
         # create episode name string a get episode id
-        ep_name = f'{serie_info['title']} (S{season_number}E{ep_number}){ep_title}'
+        if folders_mode:
+            ep_name = f'{serie_info['title']}/{season_number}/{ep_number}{ep_title}'
+        else:
+            ep_name = f'{serie_info['title']} (S{season_number}E{ep_number}){ep_title}'
+
         id = episode_info['id']
 
         # download episode
@@ -295,7 +300,7 @@ def download_filme(
         prefered_server: typing.Literal['warezcdn', 'mixdrop']
         ):
     filme_info = filme(imdb)
-    filme_name = re.sub(r"[\\\/\:\*\?\"\<\>\|]", '', filme_info['title'])
+    filme_name = re.sub(r"[\:\*\?\"\<\>\|]", '', filme_info['title'])
 
 
     # get audio options avaliable for the file
@@ -413,6 +418,11 @@ if __name__ == "__main__":
         choices=['warezcdn', 'mixdrop'], required=True, 
         help='preferência de servidor (warezcdn ou mixdrop).'
     )
+    download_serie_parser.add_argument(
+        '--criar-pastas', 
+        action='store_true', 
+        help='criar caminho de pastas \'série/temporada/episódio.mp4\'.'
+    )
 
 
     args = parser.parse_args()
@@ -442,7 +452,7 @@ if __name__ == "__main__":
                     if args.episodios[0] == -1:
                         args.episodios = 'all'
 
-                    download_serie(args.imdb, args.temporada, args.episodios, args.audio, args.servidor)
+                    download_serie(args.imdb, args.temporada, args.episodios, args.audio, args.servidor, args.criar_pastas)
                 
                 case _:
                     parser.print_help()
