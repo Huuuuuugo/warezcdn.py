@@ -132,7 +132,7 @@ class Download():
         if self.try_continue:
             # store total_size inside a property
             try:
-                self.total_size = int(self.response.headers['Content-Length'])
+                self.total_size = int(self.response.headers['Content-Length']) + self.written_bytes
 
             except KeyError:
                 message = f"The response has no 'Content-Length' header, resuming and progress tracking will not work. If the output file contains some data already, it will be completely cleared when 'start()' is called."
