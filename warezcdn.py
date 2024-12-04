@@ -429,7 +429,18 @@ if __name__ == "__main__":
     
     match args.action:
         case 'search':
-            print(json.dumps(search(args.search), indent=2))
+            results = search(args.search)
+            print(f'Resultados: {results['count']}')
+            input()
+
+            for key in results['list'].keys():
+                item = results['list'][key]
+                print(f'[{int(key)+1}/{results['count']}]')
+                print(f'Nome: {item['title']}')
+                print(f'IMDb: {item['imdb']}')
+                print(f'Tipo: {item['type']}')
+                print(f'Ano: {item['year']}')
+                input()
         
         case 'info':
             match args.variant:
