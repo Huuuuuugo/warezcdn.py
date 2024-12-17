@@ -217,7 +217,7 @@ def download_episode(
     video_url = get_video_url(imdb, audio['id'], server, audio['audio'], 'serie')
 
     # create temporary directory for the download
-    temp_dir = f'{temp_download_dir}{id}{audio['id']}'
+    temp_dir = f'{temp_download_dir}{id}{audio['id']}/'
     os.makedirs(temp_dir, exist_ok=True)
 
     match server:
@@ -227,8 +227,9 @@ def download_episode(
         case 'mixdrop':
             download_from_mixdrop(video_url, f'{ep_name}.mp4', temp_dir)
 
-    # remove temp dir after finnished
-    shutil.rmtree(temp_dir)
+    # remove temp dir after finished
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
 
 
 def download_serie(
@@ -335,8 +336,9 @@ def download_filme(
         case 'mixdrop':
             download_from_mixdrop(video_url, f'{filme_name}.mp4', temp_dir)
     
-    # remove temp dir after finnished
-    shutil.rmtree(temp_dir)
+    # remove temp dir after finished
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":

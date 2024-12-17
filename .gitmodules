@@ -1,0 +1,3 @@
+[submodule "m3u8_downloader"]
+	path = m3u8_downloader
+	url = https://github.com/Huuuuuugo/m3u8_downloader.git
