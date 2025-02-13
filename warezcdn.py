@@ -41,7 +41,7 @@ def serie(imdb: str):
     html = BeautifulSoup(referer_response.content, 'html.parser')
     scripts = html.find_all('script')
     for script in scripts:
-        serie_url = re.findall(r"var cachedSeasons = (?:\'|\")(.+)(?:\'|\")", script.string)
+        serie_url = re.findall(r"var cachedSeasons = (?:\'|\")(.+)(?:\'|\")", script.text)
         if serie_url:
             serie_url = f'{host_url}/{serie_url[0]}'
             break
@@ -85,7 +85,7 @@ def get_audios(imdb: str, id: str, type: typing.Literal['movie', 'filme', 'serie
             html = BeautifulSoup(response.content, 'html.parser')
             scripts = html.find_all('script')
             for script in scripts:
-                audio_data = re.findall(r"let data = (?:\'|\")(.+)(?:\'|\")", script.string)
+                audio_data = re.findall(r"let data = (?:\'|\")(.+)(?:\'|\")", script.text)
                 if audio_data:
                     audio_data = audio_data[0]
                     break
@@ -124,7 +124,7 @@ def get_video_url(
     play_html = BeautifulSoup(play_response.content, 'html.parser')
     scripts = play_html.find_all('script')
     for script in scripts:
-        video_html_url = re.findall(r"window.location.href = (?:\'|\")(.+)(?:\'|\")", script.string)
+        video_html_url = re.findall(r"window.location.href = (?:\'|\")(.+)(?:\'|\")", script.text)
         if video_html_url:
             video_html_url = video_html_url[0]
             break
@@ -165,8 +165,8 @@ def get_video_url(
             video_html = BeautifulSoup(video_html_response.content, 'html.parser')
             scripts = video_html.find_all('script')
             for script in scripts:
-                if 'MDCore' in str(script.string):
-                    matches = re.findall(r"eval\((.+)\)", script.string)
+                if 'MDCore' in str(script.text):
+                    matches = re.findall(r"eval\((.+)\)", script.text)
                     if matches:
                         obfuscated_json = matches[0]
                         break
