@@ -35,7 +35,8 @@ def download_from_m3u8(url: str, output_file: str, temp_dir: str):
     label = f'(warezcdn) {file_name}'
 
     # create output directory
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    if os.path.dirname(output_file):
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
     # download playlist
     m3u8_path = f"{temp_dir}index.m3u8"
@@ -87,8 +88,9 @@ def download_from_mixdrop(url: str, output_file: str, temp_dir: str):
             print(f'\033[F\r{label} {download.progress:.2f}%   ')
             time.sleep(0.1)
             
-    print(f'\033[F\r{label} 100%   ')
+    print(f'\033[F\r{label} 100.00%   ')
 
     # move temp download to output file
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    if os.path.dirname(output_file):
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
     shutil.move(temp_file, output_file)
