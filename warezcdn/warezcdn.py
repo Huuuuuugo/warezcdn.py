@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 import STPyV8
 import requests
 
-from utils import download_from_m3u8, download_from_mixdrop
+from .utils import download_from_m3u8, download_from_mixdrop
 
 
 host = 'warezcdn.link'
@@ -341,7 +341,7 @@ def download_filme(
         shutil.rmtree(temp_dir)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     subparser = parser.add_subparsers(dest='action', help='comandos disponíveis:')
 
@@ -473,3 +473,6 @@ if __name__ == "__main__":
         
         case _:
             parser.print_help()
+
+if __name__ == "__main__":
+    main()
