@@ -142,12 +142,12 @@ def get_video_url(
             master_m3u8_url = requests.post(
                 master_request_url,
                 data={'hash': video_hash, 'r': ''},
-                headers={'X-Requested-With': 'XMLHttpRequest'}
+                headers={'X-Requested-With': 'XMLHttpRequest', 'Referer': host_url}
                 )
             master_m3u8_url = master_m3u8_url.json()['videoSource']
 
             # extract the url for the playlist containing all the parts from master.m3u8
-            master_m3u8 = requests.get(master_m3u8_url).text
+            master_m3u8 = requests.get(master_m3u8_url, headers={'Referer': host_url}).text
             for line in master_m3u8.split('\n'):
                 matches = re.match(r"https?://[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})(:\d+)?(/[^\s]*)?", line)
                 if matches:
